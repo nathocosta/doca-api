@@ -1,0 +1,24 @@
+[package]
+name = "secure_pdf_converter"
+version = "0.1.0"
+edition = "2021"
+
+[features]
+default = []
+shuttle = ["dep:shuttle-runtime", "dep:shuttle-axum"]
+
+[dependencies]
+axum = { version = "0.7.5", features = ["multipart"] }
+tokio = { version = "1.38", features = ["full"] }
+tower-http = { version = "0.5.2", features = ["cors", "compression-full"] }
+rust-embed = "8.4.0"
+lopdf = "0.32.0"
+printpdf = { version = "0.7.0", features = ["embedded_images"] }
+mime_guess = "2.0.4"
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+anyhow = "1.0"
+
+# Optional dependencies for Shuttle deployment
+shuttle-runtime = { version = "0.47.0", optional = true }
+shuttle-axum = { version = "0.47.0", optional = true }

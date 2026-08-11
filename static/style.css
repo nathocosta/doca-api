@@ -1,0 +1,74 @@
+/* General Page Styles */
+body {
+    background-color: #FAFAFA;
+    transition: background-color 0.3s ease, color 0.3s ease;
+}
+.dark body {
+    background-color: #0d0f11;
+}
+.soft-glow {
+    box-shadow: 0 10px 40px -10px rgba(82, 96, 105, 0.06);
+    transition: box-shadow 0.3s ease, border-color 0.3s ease, background-color 0.3s ease;
+}
+.dark .soft-glow {
+    box-shadow: 0 10px 40px -10px rgba(0, 0, 0, 0.4);
+}
+.hover-lift {
+    transition: transform 0.25s cubic-bezier(0.4, 0, 0.2, 1), box-shadow 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+}
+.hover-lift:hover {
+    transform: translateY(-6px);
+    box-shadow: 0 20px 40px -10px rgba(82, 96, 105, 0.1);
+}
+.dark .hover-lift:hover {
+    box-shadow: 0 20px 45px -10px rgba(0, 0, 0, 0.6);
+}
+
+/* Modal Backdrop Fade In / Scale Up */
+.modal-active {
+    opacity: 1 !important;
+}
+.modal-active > div {
+    transform: scale(1) !important;
+}
+
+/* Loading Animation Styles */
+@keyframes loading-breathe {
+    0%, 100% { transform: translateY(0); }
+    50% { transform: translateY(-3px); }
+}
+
+/* Arm wiggling / writing on screen animation */
+@keyframes scribble-arm {
+    0%, 100% { transform: translate(0, 0) rotate(0deg); }
+    25% { transform: translate(-3px, -2px) rotate(-6deg); }
+    50% { transform: translate(2px, 3px) rotate(4deg); }
+    75% { transform: translate(-1px, 1px) rotate(-3deg); }
+}
+
+.loading-mascot-body {
+    transform-origin: bottom center;
+    animation: loading-breathe 2s ease-in-out infinite;
+}
+
+.loading-writing-arm {
+    animation: scribble-arm 0.25s ease-in-out infinite;
+    transform-origin: 148px 120px;
+}
+
+/* Estilos do Mascote (Doca) - O container foi mantido para aplicar o efeito hover na imagem */
+.mascote-container {
+    position: relative;
+    cursor: pointer;
+    user-select: none;
+    width: 250px;
+    height: 300px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: transform 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+}
+
+.mascote-container:hover {
+    transform: scale(1.04);
+}
