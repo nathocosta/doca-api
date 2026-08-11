@@ -394,7 +394,11 @@
         <div class="bg-surface-container-lowest dark:bg-zinc-900 border border-surface-variant dark:border-zinc-800 rounded-3xl p-lg max-w-md w-full mx-margin-mobile shadow-2xl relative transform scale-95 transition-transform duration-300">
             <!-- Processing State -->
             <div id="status-processing-state" class="hidden flex flex-col items-center text-center gap-md">
-                <div class="w-16 h-16 border-4 border-primary border-t-transparent animate-spin rounded-full"></div>
+                <!-- Rotating Gear SVG -->
+                <svg class="w-16 h-16 text-primary dark:text-zinc-200 animate-spin" style="animation-duration: 3s;" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.1a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"/>
+                    <circle cx="12" cy="12" r="3"/>
+                </svg>
                 <h3 class="font-title-md text-primary dark:text-zinc-200">Processando Documentos...</h3>
                 <p class="font-body-md text-on-surface-variant dark:text-zinc-400">Sua conversão está sendo feita de forma segura na memória. Aguarde um instante.</p>
             </div>
@@ -431,69 +435,20 @@
         </div>
     </div>
 
-    <!-- Loading Screen Overlay (Doca writing on screen facing forward) -->
+    <!-- Loading Screen Overlay (Rotating Gear) -->
     <div id="loading-screen" class="fixed inset-0 z-[100] flex flex-col items-center justify-center bg-background/90 dark:bg-zinc-950/95 backdrop-blur-md hidden transition-opacity duration-300 opacity-0">
         <!-- Loading Mascot Wrapper -->
-        <div class="loading-image-wrapper relative w-64 h-64 flex items-center justify-center">
-            <!-- Front-facing Doca writing on screen with SVG -->
-            <svg class="w-56 h-56" viewBox="0 0 200 200" fill="none" xmlns="http://www.w3.org/2000/svg">
-                <!-- Mascot Body Shadow -->
-                <ellipse cx="100" cy="175" rx="55" ry="10" fill="rgba(0, 0, 0, 0.08)" />
-                
-                <g class="loading-mascot-body">
-                    <!-- Main Paper Sheet -->
-                    <path d="M 50,40 L 50,150 A 12,12 0 0 0 62,162 L 138,162 A 12,12 0 0 0 150,150 L 150,65 L 125,40 L 62,40 A 12,12 0 0 0 50,40 Z" 
-                          fill="url(#loading-paper-gradient)" 
-                          stroke="#94A3B8" 
-                          stroke-width="3" />
-                    
-                    <!-- Folded corner (dog ear) -->
-                    <path d="M 125,40 L 125,53 A 12,12 0 0 0 137,65 L 150,65 Z" fill="#E2E8F0" />
-                    <path d="M 125,40 L 150,65 L 125,65 Z" fill="#CBD5E1" stroke="#94A3B8" stroke-width="2" class="paper-fold" />
-                    
-                    <!-- Face (Happy, writing on screen) -->
-                    <circle cx="68" cy="112" r="8" fill="#FDA4AF" opacity="0.7" />
-                    <circle cx="132" cy="112" r="8" fill="#FDA4AF" opacity="0.7" />
-                    <path d="M 75,98 Q 82,90 89,98" stroke="#1E293B" stroke-width="3.5" stroke-linecap="round" fill="none" />
-                    <path d="M 111,98 Q 118,90 125,98" stroke="#1E293B" stroke-width="3.5" stroke-linecap="round" fill="none" />
-                    <path d="M 94,110 Q 100,120 106,110" stroke="#1E293B" stroke-width="3.5" stroke-linecap="round" fill="none" />
-                    
-                    <!-- Legs (Thick vertical legs with feet) -->
-                    <rect x="76" y="160" width="8" height="15" rx="3" fill="#FFFFFF" stroke="#94A3B8" stroke-width="2.5" />
-                    <ellipse cx="70" cy="175" rx="12" ry="6" fill="#FFFFFF" stroke="#94A3B8" stroke-width="2.5" />
-                    <rect x="116" y="160" width="8" height="15" rx="3" fill="#FFFFFF" stroke="#94A3B8" stroke-width="2.5" />
-                    <ellipse cx="130" cy="175" rx="12" ry="6" fill="#FFFFFF" stroke="#94A3B8" stroke-width="2.5" />
-                    
-                    <!-- Left arm (resting at side) -->
-                    <path d="M 52,125 C 38,125 32,133 32,143 C 32,149 37,155 43,155 C 47,155 50,148 50,140 Z" fill="#FFFFFF" stroke="#94A3B8" stroke-width="2.5" />
-                    
-                    <!-- Right arm (thick, raised up, holding pencil, writing on screen) -->
-                    <g class="loading-writing-arm">
-                        <!-- Curved arm raised up to write -->
-                        <path d="M 148,120 C 148,110 135,92 125,92 C 119,92 115,98 115,104 C 115,110 135,124 148,124 Z" fill="#FFFFFF" stroke="#94A3B8" stroke-width="2.5" />
-                        <!-- Red Pencil in hand -->
-                        <g transform="translate(10, 4)">
-                            <rect x="100" y="80" width="6" height="18" rx="1" fill="#DC2626" stroke="#94A3B8" stroke-width="1" transform="rotate(-35, 103, 89)" />
-                            <polygon points="100,80 103,73 106,80" fill="#FDE047" stroke="#94A3B8" stroke-width="0.8" transform="rotate(-35, 103, 89)" />
-                            <polygon points="102,76 103,73 104,76" fill="#1E293B" transform="rotate(-35, 103, 89)" />
-                        </g>
-                    </g>
-                </g>
-                <defs>
-                    <linearGradient id="loading-paper-gradient" x1="50" y1="40" x2="150" y2="162" gradientUnits="userSpaceOnUse">
-                        <stop offset="0%" stop-color="#FFFFFF" />
-                        <stop offset="100%" stop-color="#F1F5F9" />
-                    </linearGradient>
-                </defs>
+        <div class="loading-image-wrapper relative w-48 h-48 flex items-center justify-center">
+            <!-- Rotating Gear SVG -->
+            <svg class="w-32 h-32 text-primary dark:text-zinc-200 animate-spin" style="animation-duration: 4s;" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.1a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"/>
+                <circle cx="12" cy="12" r="3"/>
             </svg>
-            <!-- Sparks/Drawing dots on screen -->
-            <span class="absolute top-[34%] left-[58%] animate-ping w-2.5 h-2.5 rounded-full bg-amber-400 opacity-75"></span>
-            <span class="absolute top-[40%] left-[62%] animate-ping w-1.5 h-1.5 rounded-full bg-amber-300 opacity-60"></span>
         </div>
         
         <!-- Text -->
-        <h2 class="text-xl font-headline-lg text-primary dark:text-zinc-100 mt-md animate-pulse">Desenhando seu PDF...</h2>
-        <p class="text-sm font-body-md text-on-surface-variant dark:text-zinc-400 mt-xs">O Doca está preparando tudo com muito carinho.</p>
+        <h2 class="text-xl font-headline-lg text-primary dark:text-zinc-100 mt-md animate-pulse">Processando...</h2>
+        <p class="text-sm font-body-md text-on-surface-variant dark:text-zinc-400 mt-xs">Aguarde enquanto preparamos os seus arquivos.</p>
     </div>
 
     <!-- Scripts -->

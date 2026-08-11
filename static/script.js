@@ -61,6 +61,9 @@ aboutModal.addEventListener('click', (e) => {
 });
 
 
+// --- Configuration ---
+const API_BASE_URL = 'https://doca-api.onrender.com';
+
 // --- State Management ---
 let currentTool = '';
 let selectedFiles = []; // Array of { id, file, name, size }
@@ -439,7 +442,7 @@ async function processDocuments() {
         formData.append('password', document.getElementById('unlock-password').value);
     }
 
-    const endpoint = `/api/${currentTool}`;
+    const endpoint = `${API_BASE_URL}/api/${currentTool}`;
 
     try {
         const response = await fetch(endpoint, {
