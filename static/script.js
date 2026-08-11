@@ -450,10 +450,15 @@ async function processDocuments() {
         if (!response.ok) {
             let errorText = 'Erro no processamento interno do servidor.';
             try {
-                const errData = await response.json();
-                errorText = errData.error || errorText;
+                const rawText = await response.text();
+                try {
+                    const errData = JSON.parse(rawText);
+                    errorText = errData.error || rawText || errorText;
+                } catch (jsonErr) {
+                    errorText = rawText || `Erro no servidor (${response.status})`;
+                }
             } catch (e) {
-                errorText = await response.text() || `Erro no servidor (${response.status})`;
+                errorText = `Erro no servidor (${response.status})`;
             }
             throw new Error(errorText);
         }
