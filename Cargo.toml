@@ -1,5 +1,5 @@
 [package]
-name = "secure_pdf_converter"
+name = "doca-api"
 version = "0.1.0"
 edition = "2021"
 
