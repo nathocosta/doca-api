@@ -324,6 +324,23 @@ pub fn images_to_pdf(images: Vec<Vec<u8>>) -> Result<Vec<u8>, String> {
     Ok(output)
 }
 
+/// Compress a PDF document to reduce its file size
+pub fn compress_pdf(file: &[u8]) -> Result<Vec<u8>, String> {
+    validate_pdf_header(file)?;
+    let mut doc = Document::load_mem(file).map_err(|e| format!("Failed to load PDF: {}", e))?;
+    
+    // Compress stream objects
+    for (_, object) in doc.objects.iter_mut() {
+        if let Object::Stream(stream) = object {
+            let _ = stream.compress();
+        }
+    }
+    
+    let mut output = Vec::new();
+    doc.save_to(&mut output).map_err(|e| format!("Failed to save compressed PDF: {}", e))?;
+    Ok(output)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

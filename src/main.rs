@@ -215,6 +215,46 @@ async fn handle_img_to_pdf(
     ))
 }
 
+/// Compresses a PDF document
+async fn handle_compress(
+    State(state): State<AppState>,
+    mut multipart: Multipart,
+) -> Result<impl IntoResponse, ApiError> {
+    let mut file_bytes = None;
+    let mut files_count = 0;
+
+    while let Some(field) = multipart.next_field().await.map_err(|e| ApiError(StatusCode::BAD_REQUEST, e.to_string()))? {
+        let name = field.name().unwrap_or("").to_string();
+        if name == "files" {
+            files_count += 1;
+            if files_count > 1 {
+                return Err(ApiError(StatusCode::BAD_REQUEST, "Selecione apenas 1 arquivo PDF para compactar.".to_string()));
+            }
+            let data = field.bytes().await.map_err(|e| ApiError(StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+            if data.len() > 30 * 1024 * 1024 {
+                return Err(ApiError(StatusCode::BAD_REQUEST, "O arquivo PDF não deve exceder 30MB.".to_string()));
+            }
+            file_bytes = Some(data.to_vec());
+        }
+    }
+
+    let file_bytes = file_bytes.ok_or_else(|| ApiError(StatusCode::BAD_REQUEST, "Arquivo PDF não fornecido para compactação.".to_string()))?;
+
+    // Acquire semaphore permit
+    let _permit = state.semaphore.acquire().await.map_err(|e| ApiError(StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+
+    let compressed_bytes = pdf_ops::compress_pdf(&file_bytes).map_err(|e| ApiError(StatusCode::BAD_REQUEST, e))?;
+
+    Ok((
+        StatusCode::OK,
+        [
+            (header::CONTENT_TYPE, "application/pdf"),
+            (header::CONTENT_DISPOSITION, "attachment; filename=\"documento_compactado.pdf\""),
+        ],
+        compressed_bytes,
+    ))
+}
+
 /// Common Router Initialization
 fn init_router() -> Router {
     let cors = CorsLayer::new()
@@ -238,6 +278,7 @@ fn init_router() -> Router {
         .route("/api/merge", post(handle_merge))
         .route("/api/split", post(handle_split))
         .route("/api/rotate", post(handle_rotate))
+        .route("/api/compress", post(handle_compress))
 
         .route("/api/img-to-pdf", post(handle_img_to_pdf))
         .with_state(state)
