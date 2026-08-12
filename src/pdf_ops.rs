@@ -8,6 +8,9 @@ use std::io::{BufWriter, Cursor};
 
 /// Valida se os bytes representam um arquivo PDF válido (inicia com %PDF-)
 pub fn validate_pdf_header(bytes: &[u8]) -> Result<(), String> {
+    if bytes.is_empty() {
+        return Err("O arquivo PDF enviado está vazio (0 bytes).".to_string());
+    }
     if bytes.len() < 5 || !bytes.starts_with(b"%PDF-") {
         return Err("Assinatura de arquivo PDF inválida. O arquivo deve começar com '%PDF-'.".to_string());
     }
@@ -16,6 +19,9 @@ pub fn validate_pdf_header(bytes: &[u8]) -> Result<(), String> {
 
 /// Valida se os bytes representam uma imagem PNG ou JPEG válida
 pub fn validate_image_header(bytes: &[u8]) -> Result<(), String> {
+    if bytes.is_empty() {
+        return Err("A imagem enviada está vazia (0 bytes).".to_string());
+    }
     let is_png = bytes.starts_with(&[137, 80, 78, 71, 13, 10, 26, 10]);
     let is_jpeg = bytes.starts_with(&[255, 216, 255]);
     if !is_png && !is_jpeg {

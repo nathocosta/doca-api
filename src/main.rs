@@ -102,6 +102,9 @@ async fn handle_split(
             if val.len() > 200 {
                 return Err(ApiError(StatusCode::BAD_REQUEST, "Parâmetro de páginas inválido ou muito longo.".to_string()));
             }
+            if !val.chars().all(|c| c.is_ascii_digit() || c == ' ' || c == ',' || c == '-') {
+                return Err(ApiError(StatusCode::BAD_REQUEST, "Parâmetro de páginas contém caracteres inválidos. Use apenas números, vírgulas e hífen.".to_string()));
+            }
             ranges = val;
         }
     }
@@ -197,6 +200,9 @@ async fn handle_unlock(
             let val = field.text().await.map_err(|e| ApiError(StatusCode::BAD_REQUEST, e.to_string()))?;
             if val.len() > 100 {
                 return Err(ApiError(StatusCode::BAD_REQUEST, "Senha muito longa.".to_string()));
+            }
+            if val.chars().any(|c| c.is_control()) {
+                return Err(ApiError(StatusCode::BAD_REQUEST, "A senha contém caracteres de controle inválidos.".to_string()));
             }
             password = val;
         }
