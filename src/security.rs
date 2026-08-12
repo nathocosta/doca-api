@@ -7,7 +7,7 @@ use axum::{
     extract::{ConnectInfo, Request, State},
     middleware::Next,
     response::{Response, IntoResponse},
-    http::{StatusCode, header},
+    http::StatusCode,
     Json,
 };
 use serde_json::json;
@@ -118,57 +118,4 @@ pub async fn rate_limit_middleware(
     }
 }
 
-// --- AUTHENTICATION ---
 
-pub struct AuthConfig {
-    pub api_key: String,
-}
-
-impl AuthConfig {
-    pub fn from_env() -> Self {
-        let key = std::env::var("DOCA_API_KEY").unwrap_or_else(|_| {
-            let default_key = "doca-default-secret-key-2026".to_string();
-            println!(
-                "⚠️ [WARN] Variável de ambiente DOCA_API_KEY não definida. Usando chave padrão: '{}'",
-                default_key
-            );
-            default_key
-        });
-        Self { api_key: key }
-    }
-}
-
-/// Axum middleware function for Authentication
-pub async fn auth_middleware(
-    State(config): State<Arc<AuthConfig>>,
-    req: Request,
-    next: Next,
-) -> Response {
-    // Exclude static assets or only apply to api routes
-    let path = req.uri().path();
-    if !path.starts_with("/api/") {
-        return next.run(req).await;
-    }
-
-    let mut authenticated = false;
-
-    if let Some(auth_header) = req.headers().get(header::AUTHORIZATION) {
-        if let Ok(auth_str) = auth_header.to_str() {
-            if auth_str.starts_with("Bearer ") {
-                let token = &auth_str[7..];
-                if token == config.api_key {
-                    authenticated = true;
-                }
-            }
-        }
-    }
-
-    if authenticated {
-        next.run(req).await
-    } else {
-        let body = json!({
-            "error": "Autenticação necessária. Chave de acesso inválida ou ausente."
-        });
-        (StatusCode::UNAUTHORIZED, Json(body)).into_response()
-    }
-}

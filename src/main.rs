@@ -261,11 +261,15 @@ async fn handle_img_to_pdf(
 /// Common Router Initialization
 fn init_router() -> Router {
     let cors = CorsLayer::new()
-        .allow_origin(Any)
+        .allow_origin(tower_http::cors::AllowOrigin::predicate(|origin, _| {
+            let origin_bytes = origin.as_bytes();
+            origin_bytes == b"https://nathocosta.github.io" ||
+            origin_bytes.starts_with(b"http://localhost:") ||
+            origin_bytes.starts_with(b"http://127.0.0.1:")
+        }))
         .allow_methods(Any)
         .allow_headers(Any);
 
-    let auth_config = Arc::new(security::AuthConfig::from_env());
     let limiter = Arc::new(security::RateLimiter::new(30.0, 60.0)); // 30 requests per minute
     let semaphore = Arc::new(Semaphore::new(3)); // max 3 parallel heavy operations
 
@@ -281,9 +285,8 @@ fn init_router() -> Router {
         .route("/api/img-to-pdf", post(handle_img_to_pdf))
         .with_state(state)
         // Order of middleware execution: last added is run first.
-        // We want Rate Limiter to run first (outermost layer), then Auth.
+        // We want Rate Limiter to run first (outermost layer).
         .layer(middleware::from_fn_with_state(limiter, security::rate_limit_middleware))
-        .layer(middleware::from_fn_with_state(auth_config, security::auth_middleware))
         // Set maximum request limit to 50MB (matching total upload limits)
         .layer(DefaultBodyLimit::max(50 * 1024 * 1024))
         .layer(cors)
