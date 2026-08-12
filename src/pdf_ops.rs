@@ -6,6 +6,24 @@ use printpdf::image_crate::codecs::png::PngDecoder;
 use printpdf::image_crate::codecs::jpeg::JpegDecoder;
 use std::io::{BufWriter, Cursor};
 
+/// Valida se os bytes representam um arquivo PDF válido (inicia com %PDF-)
+pub fn validate_pdf_header(bytes: &[u8]) -> Result<(), String> {
+    if bytes.len() < 5 || !bytes.starts_with(b"%PDF-") {
+        return Err("Assinatura de arquivo PDF inválida. O arquivo deve começar com '%PDF-'.".to_string());
+    }
+    Ok(())
+}
+
+/// Valida se os bytes representam uma imagem PNG ou JPEG válida
+pub fn validate_image_header(bytes: &[u8]) -> Result<(), String> {
+    let is_png = bytes.starts_with(&[137, 80, 78, 71, 13, 10, 26, 10]);
+    let is_jpeg = bytes.starts_with(&[255, 216, 255]);
+    if !is_png && !is_jpeg {
+        return Err("Assinatura de imagem inválida. Apenas PNG e JPEG/JPG são aceitos.".to_string());
+    }
+    Ok(())
+}
+
 /// Helper to parse page range string like "1-3, 5, 7-10"
 fn parse_range(range_str: &str, max_pages: u32) -> Result<Vec<u32>, String> {
     let mut pages = Vec::new();
@@ -46,7 +64,10 @@ fn parse_range(range_str: &str, max_pages: u32) -> Result<Vec<u32>, String> {
 /// Merge multiple PDF documents in-memory
 pub fn merge_pdfs(files: Vec<Vec<u8>>) -> Result<Vec<u8>, String> {
     if files.is_empty() {
-        return Err("No files provided for merging".to_string());
+        return Err("Nenhum arquivo fornecido para junção.".to_string());
+    }
+    for (i, file) in files.iter().enumerate() {
+        validate_pdf_header(file).map_err(|e| format!("Arquivo #{}: {}", i + 1, e))?;
     }
     if files.len() == 1 {
         return Ok(files[0].clone());
@@ -117,6 +138,7 @@ pub fn merge_pdfs(files: Vec<Vec<u8>>) -> Result<Vec<u8>, String> {
 
 /// Split single PDF by extracting range of pages
 pub fn split_pdf(file: &[u8], range_str: &str) -> Result<Vec<u8>, String> {
+    validate_pdf_header(file)?;
     let mut doc = Document::load_mem(file).map_err(|e| format!("Failed to load PDF: {}", e))?;
     
     let pages = doc.get_pages();
@@ -183,8 +205,9 @@ pub fn split_pdf(file: &[u8], range_str: &str) -> Result<Vec<u8>, String> {
 
 /// Rotate PDF pages in-memory
 pub fn rotate_pdf(file: &[u8], angle: i32) -> Result<Vec<u8>, String> {
+    validate_pdf_header(file)?;
     if angle != 90 && angle != 180 && angle != 270 {
-        return Err("Invalid rotation angle. Must be 90, 180, or 270.".to_string());
+        return Err("Ângulo de rotação inválido. Deve ser 90, 180 ou 270.".to_string());
     }
 
     let mut doc = Document::load_mem(file).map_err(|e| format!("Failed to load PDF: {}", e))?;
@@ -208,6 +231,7 @@ pub fn rotate_pdf(file: &[u8], angle: i32) -> Result<Vec<u8>, String> {
 
 /// Decrypt an encrypted PDF with a password in-memory
 pub fn unlock_pdf(file: &[u8], password: &str) -> Result<Vec<u8>, String> {
+    validate_pdf_header(file)?;
     let mut doc = Document::load_mem(file).map_err(|e| format!("Failed to load PDF: {}", e))?;
     
     if doc.is_encrypted() {
@@ -245,7 +269,10 @@ fn decode_to_printpdf_image(raw_bytes: &[u8]) -> Result<(Image, u32, u32), Strin
 /// Convert multiple images (PNG/JPG) to a single PDF in-memory
 pub fn images_to_pdf(images: Vec<Vec<u8>>) -> Result<Vec<u8>, String> {
     if images.is_empty() {
-        return Err("No images provided".to_string());
+        return Err("Nenhuma imagem fornecida.".to_string());
+    }
+    for (i, raw_img) in images.iter().enumerate() {
+        validate_image_header(raw_img).map_err(|e| format!("Imagem #{}: {}", i + 1, e))?;
     }
 
     // Load first image to initialize the document size

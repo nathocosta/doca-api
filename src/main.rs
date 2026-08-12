@@ -1,20 +1,19 @@
 mod pdf_ops;
+mod security;
 
-use rust_embed::RustEmbed;
 use axum::{
     response::{Response, IntoResponse},
-    http::{header, StatusCode, Uri},
+    http::{header, StatusCode},
     routing::post,
     Router,
-    extract::{Multipart, DefaultBodyLimit},
+    extract::{Multipart, DefaultBodyLimit, State},
     Json,
+    middleware,
 };
 use serde_json::json;
 use tower_http::cors::{CorsLayer, Any};
-
-#[derive(RustEmbed)]
-#[folder = "static/"]
-struct Asset;
+use std::sync::Arc;
+use tokio::sync::Semaphore;
 
 /// Standard API Error helper returning dynamic JSON on failure
 struct ApiError(StatusCode, String);
@@ -28,42 +27,42 @@ impl IntoResponse for ApiError {
     }
 }
 
-/// Fallback static file handler for embedded assets (index.html, styles, scripts)
-async fn static_handler(uri: Uri) -> impl IntoResponse {
-    let mut path = uri.path().trim_start_matches('/').to_string();
+#[derive(Clone)]
+struct AppState {
+    semaphore: Arc<Semaphore>,
+}
 
-    if path.is_empty() {
-        path = "index.html".to_string();
-    }
-    
-    // Support routing "/dist/style.css" -> "style.css", "/dist/app.js" -> "app.js"
-    if path.starts_with("dist/") {
-        path = path.trim_start_matches("dist/").to_string();
-    }
-
-    match Asset::get(&path) {
-        Some(content) => {
-            let mime = mime_guess::from_path(&path).first_or_octet_stream();
-            (
-                StatusCode::OK,
-                [(header::CONTENT_TYPE, mime.as_ref())],
-                content.data,
-            ).into_response()
-        }
-        None => (StatusCode::NOT_FOUND, "404 Not Found").into_response(),
-    }
+/// Fallback 404 handler for unmatched API routes
+async fn handler_404() -> impl IntoResponse {
+    (StatusCode::NOT_FOUND, Json(json!({"error": "Resource not found"})))
 }
 
 /// Merges multiple uploaded PDF files
-async fn handle_merge(mut multipart: Multipart) -> Result<impl IntoResponse, ApiError> {
+async fn handle_merge(
+    State(state): State<AppState>,
+    mut multipart: Multipart,
+) -> Result<impl IntoResponse, ApiError> {
     let mut files = Vec::new();
     while let Some(field) = multipart.next_field().await.map_err(|e| ApiError(StatusCode::BAD_REQUEST, e.to_string()))? {
         let name = field.name().unwrap_or("").to_string();
         if name == "files" {
+            if files.len() >= 15 {
+                return Err(ApiError(StatusCode::BAD_REQUEST, "Limite máximo de 15 arquivos excedido.".to_string()));
+            }
             let data = field.bytes().await.map_err(|e| ApiError(StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+            if data.len() > 30 * 1024 * 1024 {
+                return Err(ApiError(StatusCode::BAD_REQUEST, "Cada arquivo PDF individual não deve exceder 30MB.".to_string()));
+            }
             files.push(data.to_vec());
         }
     }
+
+    if files.len() < 2 {
+        return Err(ApiError(StatusCode::BAD_REQUEST, "Selecione pelo menos 2 arquivos para juntar.".to_string()));
+    }
+
+    // Acquire semaphore permit for memory-intensive PDF operations
+    let _permit = state.semaphore.acquire().await.map_err(|e| ApiError(StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
 
     let merged_bytes = pdf_ops::merge_pdfs(files).map_err(|e| ApiError(StatusCode::BAD_REQUEST, e))?;
 
@@ -78,21 +77,40 @@ async fn handle_merge(mut multipart: Multipart) -> Result<impl IntoResponse, Api
 }
 
 /// Splits a single PDF using page range guidelines
-async fn handle_split(mut multipart: Multipart) -> Result<impl IntoResponse, ApiError> {
+async fn handle_split(
+    State(state): State<AppState>,
+    mut multipart: Multipart,
+) -> Result<impl IntoResponse, ApiError> {
     let mut file_bytes = None;
     let mut ranges = String::new();
+    let mut files_count = 0;
 
     while let Some(field) = multipart.next_field().await.map_err(|e| ApiError(StatusCode::BAD_REQUEST, e.to_string()))? {
         let name = field.name().unwrap_or("").to_string();
         if name == "files" {
+            files_count += 1;
+            if files_count > 1 {
+                return Err(ApiError(StatusCode::BAD_REQUEST, "Selecione apenas 1 arquivo PDF para dividir.".to_string()));
+            }
             let data = field.bytes().await.map_err(|e| ApiError(StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+            if data.len() > 30 * 1024 * 1024 {
+                return Err(ApiError(StatusCode::BAD_REQUEST, "O arquivo PDF não deve exceder 30MB.".to_string()));
+            }
             file_bytes = Some(data.to_vec());
         } else if name == "ranges" {
-            ranges = field.text().await.map_err(|e| ApiError(StatusCode::BAD_REQUEST, e.to_string()))?;
+            let val = field.text().await.map_err(|e| ApiError(StatusCode::BAD_REQUEST, e.to_string()))?;
+            if val.len() > 200 {
+                return Err(ApiError(StatusCode::BAD_REQUEST, "Parâmetro de páginas inválido ou muito longo.".to_string()));
+            }
+            ranges = val;
         }
     }
 
-    let file_bytes = file_bytes.ok_or_else(|| ApiError(StatusCode::BAD_REQUEST, "Missing PDF file to split".to_string()))?;
+    let file_bytes = file_bytes.ok_or_else(|| ApiError(StatusCode::BAD_REQUEST, "Arquivo PDF não fornecido para divisão.".to_string()))?;
+    
+    // Acquire semaphore permit
+    let _permit = state.semaphore.acquire().await.map_err(|e| ApiError(StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+
     let split_bytes = pdf_ops::split_pdf(&file_bytes, &ranges).map_err(|e| ApiError(StatusCode::BAD_REQUEST, e))?;
 
     Ok((
@@ -106,22 +124,42 @@ async fn handle_split(mut multipart: Multipart) -> Result<impl IntoResponse, Api
 }
 
 /// Rotates all pages in a PDF document
-async fn handle_rotate(mut multipart: Multipart) -> Result<impl IntoResponse, ApiError> {
+async fn handle_rotate(
+    State(state): State<AppState>,
+    mut multipart: Multipart,
+) -> Result<impl IntoResponse, ApiError> {
     let mut file_bytes = None;
-    let mut angle = 90;
+    let mut angle = None;
+    let mut files_count = 0;
 
     while let Some(field) = multipart.next_field().await.map_err(|e| ApiError(StatusCode::BAD_REQUEST, e.to_string()))? {
         let name = field.name().unwrap_or("").to_string();
         if name == "files" {
+            files_count += 1;
+            if files_count > 1 {
+                return Err(ApiError(StatusCode::BAD_REQUEST, "Selecione apenas 1 arquivo PDF para rotacionar.".to_string()));
+            }
             let data = field.bytes().await.map_err(|e| ApiError(StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+            if data.len() > 30 * 1024 * 1024 {
+                return Err(ApiError(StatusCode::BAD_REQUEST, "O arquivo PDF não deve exceder 30MB.".to_string()));
+            }
             file_bytes = Some(data.to_vec());
         } else if name == "angle" {
             let text = field.text().await.map_err(|e| ApiError(StatusCode::BAD_REQUEST, e.to_string()))?;
-            angle = text.parse::<i32>().unwrap_or(90);
+            let val = text.parse::<i32>().map_err(|_| ApiError(StatusCode::BAD_REQUEST, "Ângulo de rotação deve ser um inteiro válido.".to_string()))?;
+            if val != 90 && val != 180 && val != 270 {
+                return Err(ApiError(StatusCode::BAD_REQUEST, "Ângulo inválido. Escolha 90, 180 ou 270.".to_string()));
+            }
+            angle = Some(val);
         }
     }
 
-    let file_bytes = file_bytes.ok_or_else(|| ApiError(StatusCode::BAD_REQUEST, "Missing PDF file to rotate".to_string()))?;
+    let file_bytes = file_bytes.ok_or_else(|| ApiError(StatusCode::BAD_REQUEST, "Arquivo PDF não fornecido para rotação.".to_string()))?;
+    let angle = angle.unwrap_or(90);
+
+    // Acquire semaphore permit
+    let _permit = state.semaphore.acquire().await.map_err(|e| ApiError(StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+
     let rotated_bytes = pdf_ops::rotate_pdf(&file_bytes, angle).map_err(|e| ApiError(StatusCode::BAD_REQUEST, e))?;
 
     Ok((
@@ -135,21 +173,40 @@ async fn handle_rotate(mut multipart: Multipart) -> Result<impl IntoResponse, Ap
 }
 
 /// Removes encryption/password from a PDF document
-async fn handle_unlock(mut multipart: Multipart) -> Result<impl IntoResponse, ApiError> {
+async fn handle_unlock(
+    State(state): State<AppState>,
+    mut multipart: Multipart,
+) -> Result<impl IntoResponse, ApiError> {
     let mut file_bytes = None;
     let mut password = String::new();
+    let mut files_count = 0;
 
     while let Some(field) = multipart.next_field().await.map_err(|e| ApiError(StatusCode::BAD_REQUEST, e.to_string()))? {
         let name = field.name().unwrap_or("").to_string();
         if name == "files" {
+            files_count += 1;
+            if files_count > 1 {
+                return Err(ApiError(StatusCode::BAD_REQUEST, "Selecione apenas 1 arquivo PDF para desbloquear.".to_string()));
+            }
             let data = field.bytes().await.map_err(|e| ApiError(StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+            if data.len() > 30 * 1024 * 1024 {
+                return Err(ApiError(StatusCode::BAD_REQUEST, "O arquivo PDF não deve exceder 30MB.".to_string()));
+            }
             file_bytes = Some(data.to_vec());
         } else if name == "password" {
-            password = field.text().await.map_err(|e| ApiError(StatusCode::BAD_REQUEST, e.to_string()))?;
+            let val = field.text().await.map_err(|e| ApiError(StatusCode::BAD_REQUEST, e.to_string()))?;
+            if val.len() > 100 {
+                return Err(ApiError(StatusCode::BAD_REQUEST, "Senha muito longa.".to_string()));
+            }
+            password = val;
         }
     }
 
-    let file_bytes = file_bytes.ok_or_else(|| ApiError(StatusCode::BAD_REQUEST, "Missing PDF file to decrypt".to_string()))?;
+    let file_bytes = file_bytes.ok_or_else(|| ApiError(StatusCode::BAD_REQUEST, "Arquivo PDF não fornecido para desbloqueio.".to_string()))?;
+    
+    // Acquire semaphore permit
+    let _permit = state.semaphore.acquire().await.map_err(|e| ApiError(StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+
     let unlocked_bytes = pdf_ops::unlock_pdf(&file_bytes, &password).map_err(|e| ApiError(StatusCode::BAD_REQUEST, e))?;
 
     Ok((
@@ -163,15 +220,31 @@ async fn handle_unlock(mut multipart: Multipart) -> Result<impl IntoResponse, Ap
 }
 
 /// Converts images to a single PDF
-async fn handle_img_to_pdf(mut multipart: Multipart) -> Result<impl IntoResponse, ApiError> {
+async fn handle_img_to_pdf(
+    State(state): State<AppState>,
+    mut multipart: Multipart,
+) -> Result<impl IntoResponse, ApiError> {
     let mut images = Vec::new();
     while let Some(field) = multipart.next_field().await.map_err(|e| ApiError(StatusCode::BAD_REQUEST, e.to_string()))? {
         let name = field.name().unwrap_or("").to_string();
         if name == "files" {
+            if images.len() >= 30 {
+                return Err(ApiError(StatusCode::BAD_REQUEST, "Limite máximo de 30 imagens excedido.".to_string()));
+            }
             let data = field.bytes().await.map_err(|e| ApiError(StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+            if data.len() > 30 * 1024 * 1024 {
+                return Err(ApiError(StatusCode::BAD_REQUEST, "Cada imagem individual não deve exceder 30MB.".to_string()));
+            }
             images.push(data.to_vec());
         }
     }
+
+    if images.is_empty() {
+        return Err(ApiError(StatusCode::BAD_REQUEST, "Selecione pelo menos 1 imagem para converter.".to_string()));
+    }
+
+    // Acquire semaphore permit
+    let _permit = state.semaphore.acquire().await.map_err(|e| ApiError(StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
 
     let pdf_bytes = pdf_ops::images_to_pdf(images).map_err(|e| ApiError(StatusCode::BAD_REQUEST, e))?;
 
@@ -192,16 +265,29 @@ fn init_router() -> Router {
         .allow_methods(Any)
         .allow_headers(Any);
 
+    let auth_config = Arc::new(security::AuthConfig::from_env());
+    let limiter = Arc::new(security::RateLimiter::new(30.0, 60.0)); // 30 requests per minute
+    let semaphore = Arc::new(Semaphore::new(3)); // max 3 parallel heavy operations
+
+    let state = AppState {
+        semaphore,
+    };
+
     Router::new()
         .route("/api/merge", post(handle_merge))
         .route("/api/split", post(handle_split))
         .route("/api/rotate", post(handle_rotate))
         .route("/api/unlock", post(handle_unlock))
         .route("/api/img-to-pdf", post(handle_img_to_pdf))
-        // Set maximum request limit to 50MB (matching file sizes)
+        .with_state(state)
+        // Order of middleware execution: last added is run first.
+        // We want Rate Limiter to run first (outermost layer), then Auth.
+        .layer(middleware::from_fn_with_state(limiter, security::rate_limit_middleware))
+        .layer(middleware::from_fn_with_state(auth_config, security::auth_middleware))
+        // Set maximum request limit to 50MB (matching total upload limits)
         .layer(DefaultBodyLimit::max(50 * 1024 * 1024))
         .layer(cors)
-        .fallback(static_handler)
+        .fallback(handler_404)
 }
 
 /// Shuttle deployment entrypoint
@@ -222,7 +308,16 @@ async fn main() {
         .parse::<u16>()
         .unwrap_or(3000);
     let addr = format!("0.0.0.0:{}", port);
+    
+    // Set up TCP Listener supporting connection info for rate limiter fallback
     let listener = tokio::net::TcpListener::bind(&addr).await.unwrap();
     println!("🚀 Server running at http://{}", addr);
-    axum::serve(listener, router).await.unwrap();
+    
+    axum::serve(
+        listener,
+        router.into_make_service_with_connect_info::<std::net::SocketAddr>(),
+    )
+    .await
+    .unwrap();
 }
+
