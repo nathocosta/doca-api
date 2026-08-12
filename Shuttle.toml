@@ -1,4 +1,0 @@
-name = "doca"
-
-[build]
-features = ["shuttle"]

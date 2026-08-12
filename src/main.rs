@@ -249,17 +249,7 @@ fn init_router() -> Router {
         .layer(cors)
         .fallback(handler_404)
 }
-
-/// Shuttle deployment entrypoint
-#[cfg(feature = "shuttle")]
-#[shuttle_runtime::main]
-async fn main() -> shuttle_axum::ShuttleAxum {
-    let router = init_router();
-    Ok(router.into())
-}
-
-/// Local standalone server entrypoint (run with standard `cargo run`)
-#[cfg(not(feature = "shuttle"))]
+/// Standalone server entrypoint (run with standard `cargo run`)
 #[tokio::main]
 async fn main() {
     let router = init_router();
