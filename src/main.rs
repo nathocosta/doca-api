@@ -175,55 +175,6 @@ async fn handle_rotate(
     ))
 }
 
-/// Removes encryption/password from a PDF document
-async fn handle_unlock(
-    State(state): State<AppState>,
-    mut multipart: Multipart,
-) -> Result<impl IntoResponse, ApiError> {
-    let mut file_bytes = None;
-    let mut password = String::new();
-    let mut files_count = 0;
-
-    while let Some(field) = multipart.next_field().await.map_err(|e| ApiError(StatusCode::BAD_REQUEST, e.to_string()))? {
-        let name = field.name().unwrap_or("").to_string();
-        if name == "files" {
-            files_count += 1;
-            if files_count > 1 {
-                return Err(ApiError(StatusCode::BAD_REQUEST, "Selecione apenas 1 arquivo PDF para desbloquear.".to_string()));
-            }
-            let data = field.bytes().await.map_err(|e| ApiError(StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
-            if data.len() > 30 * 1024 * 1024 {
-                return Err(ApiError(StatusCode::BAD_REQUEST, "O arquivo PDF não deve exceder 30MB.".to_string()));
-            }
-            file_bytes = Some(data.to_vec());
-        } else if name == "password" {
-            let val = field.text().await.map_err(|e| ApiError(StatusCode::BAD_REQUEST, e.to_string()))?;
-            if val.len() > 100 {
-                return Err(ApiError(StatusCode::BAD_REQUEST, "Senha muito longa.".to_string()));
-            }
-            if val.chars().any(|c| c.is_control()) {
-                return Err(ApiError(StatusCode::BAD_REQUEST, "A senha contém caracteres de controle inválidos.".to_string()));
-            }
-            password = val;
-        }
-    }
-
-    let file_bytes = file_bytes.ok_or_else(|| ApiError(StatusCode::BAD_REQUEST, "Arquivo PDF não fornecido para desbloqueio.".to_string()))?;
-    
-    // Acquire semaphore permit
-    let _permit = state.semaphore.acquire().await.map_err(|e| ApiError(StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
-
-    let unlocked_bytes = pdf_ops::unlock_pdf(&file_bytes, &password).map_err(|e| ApiError(StatusCode::BAD_REQUEST, e))?;
-
-    Ok((
-        StatusCode::OK,
-        [
-            (header::CONTENT_TYPE, "application/pdf"),
-            (header::CONTENT_DISPOSITION, "attachment; filename=\"unlocked_document.pdf\""),
-        ],
-        unlocked_bytes,
-    ))
-}
 
 /// Converts images to a single PDF
 async fn handle_img_to_pdf(
@@ -287,7 +238,7 @@ fn init_router() -> Router {
         .route("/api/merge", post(handle_merge))
         .route("/api/split", post(handle_split))
         .route("/api/rotate", post(handle_rotate))
-        .route("/api/unlock", post(handle_unlock))
+
         .route("/api/img-to-pdf", post(handle_img_to_pdf))
         .with_state(state)
         // Order of middleware execution: last added is run first.

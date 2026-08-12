@@ -235,22 +235,6 @@ pub fn rotate_pdf(file: &[u8], angle: i32) -> Result<Vec<u8>, String> {
     Ok(output)
 }
 
-/// Decrypt an encrypted PDF with a password in-memory
-pub fn unlock_pdf(file: &[u8], password: &str) -> Result<Vec<u8>, String> {
-    validate_pdf_header(file)?;
-    let mut doc = Document::load_mem(file).map_err(|e| format!("Failed to load PDF: {}", e))?;
-    
-    if doc.is_encrypted() {
-        doc.decrypt(password.as_bytes()).map_err(|e| format!("Invalid password: {}", e))?;
-        doc.trailer.remove(b"Encrypt");
-    } else {
-        return Err("Document is not encrypted".to_string());
-    }
-
-    let mut output = Vec::new();
-    doc.save_to(&mut output).map_err(|e| format!("Failed to save unlocked PDF: {}", e))?;
-    Ok(output)
-}
 
 /// Decode raw image bytes to a printpdf Image, returning the image object along with dimensions (width, height)
 fn decode_to_printpdf_image(raw_bytes: &[u8]) -> Result<(Image, u32, u32), String> {
