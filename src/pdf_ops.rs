@@ -341,6 +341,19 @@ pub fn compress_pdf(file: &[u8]) -> Result<Vec<u8>, String> {
     Ok(output)
 }
 
+/// Convert a Word document (DOCX) to PDF in-memory using office2pdf
+pub fn docx_to_pdf(file: &[u8]) -> Result<Vec<u8>, String> {
+    use office2pdf::config::{ConvertOptions, Format};
+    
+    let result = office2pdf::convert_bytes(
+        file,
+        Format::Docx,
+        &ConvertOptions::default()
+    ).map_err(|e| format!("Failed to convert DOCX to PDF: {:?}", e))?;
+    
+    Ok(result.pdf)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
