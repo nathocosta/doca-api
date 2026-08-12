@@ -509,6 +509,24 @@ dependencies = [
 ]
 
 [[package]]
+name = "doca-api"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "axum 0.7.9",
+ "lopdf 0.32.0",
+ "mime_guess",
+ "printpdf",
+ "rust-embed",
+ "serde",
+ "serde_json",
+ "shuttle-axum",
+ "shuttle-runtime",
+ "tokio",
+ "tower-http",
+]
+
+[[package]]
 name = "either"
 version = "1.17.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1692,24 +1710,6 @@ name = "scopeguard"
 version = "1.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "94143f37725109f92c262ed2cf5e59bce7498c01bcc1502d7b9afe439a4e9f49"
-
-[[package]]
-name = "secure_pdf_converter"
-version = "0.1.0"
-dependencies = [
- "anyhow",
- "axum 0.7.9",
- "lopdf 0.32.0",
- "mime_guess",
- "printpdf",
- "rust-embed",
- "serde",
- "serde_json",
- "shuttle-axum",
- "shuttle-runtime",
- "tokio",
- "tower-http",
-]
 
 [[package]]
 name = "semver"

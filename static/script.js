@@ -490,7 +490,11 @@ async function processDocuments() {
         showStatusOverlay('success');
     } catch (error) {
         console.error('Erro de conversão:', error);
-        errorMessageText.textContent = error.message;
+        if (error.message === 'Failed to fetch') {
+            errorMessageText.textContent = 'Não foi possível conectar ao servidor. Se o serviço estiver inativo ou iniciando (cold start), pode levar cerca de 1 minuto para responder. Por favor, tente novamente em instantes.';
+        } else {
+            errorMessageText.textContent = error.message;
+        }
         showStatusOverlay('error');
     }
 }

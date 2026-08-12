@@ -10,6 +10,7 @@ use axum::{
     Json,
 };
 use serde_json::json;
+use tower_http::cors::{CorsLayer, Any};
 
 #[derive(RustEmbed)]
 #[folder = "static/"]
@@ -186,6 +187,11 @@ async fn handle_img_to_pdf(mut multipart: Multipart) -> Result<impl IntoResponse
 
 /// Common Router Initialization
 fn init_router() -> Router {
+    let cors = CorsLayer::new()
+        .allow_origin(Any)
+        .allow_methods(Any)
+        .allow_headers(Any);
+
     Router::new()
         .route("/api/merge", post(handle_merge))
         .route("/api/split", post(handle_split))
@@ -194,6 +200,7 @@ fn init_router() -> Router {
         .route("/api/img-to-pdf", post(handle_img_to_pdf))
         // Set maximum request limit to 50MB (matching file sizes)
         .layer(DefaultBodyLimit::max(50 * 1024 * 1024))
+        .layer(cors)
         .fallback(static_handler)
 }
 
