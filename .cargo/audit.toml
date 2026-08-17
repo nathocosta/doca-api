@@ -1,0 +1,5 @@
+[advisories]
+ignore = [
+    "RUSTSEC-2026-0194", # quick-xml: Quadratic run time when checking start tag (transitive via umya-spreadsheet & office2pdf)
+    "RUSTSEC-2026-0195", # quick-xml: Unbounded namespace-declaration allocation in NsReader (transitive via umya-spreadsheet & office2pdf)
+]
