@@ -1,1 +1,20 @@
-/target
+# Cargo build output
+/target/
+
+# Backup and temp files
+**/*.rs.bk
+*.pdb
+*.swp
+*.log
+
+# Environment variables
+.env
+.env.*
+
+# IDEs and Editors
+.vscode/
+.idea/
+*.suo
+*.ntvs*
+*.njsproj
+*.sln

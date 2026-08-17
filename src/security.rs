@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 use std::net::{IpAddr, SocketAddr};
-use std::sync::Arc;
+use std::sync::{Arc, OnceLock};
 use tokio::sync::Mutex;
 use tokio::time::{Instant, Duration};
 use axum::{
@@ -111,11 +111,21 @@ pub async fn rate_limit_middleware(
     if limiter.check_limit(client_ip).await {
         next.run(req).await
     } else {
+        crate::logging::log_warn(
+            "RateLimit",
+            &format!("Rate limit exceeded for URI: {}", req.uri().path())
+        );
         let body = json!({
             "error": "Limite de requisições excedido. Por favor, aguarde um momento antes de tentar novamente."
         });
         (StatusCode::TOO_MANY_REQUESTS, Json(body)).into_response()
     }
+}
+
+pub static PASSWORD_RATE_LIMITER: OnceLock<Arc<RateLimiter>> = OnceLock::new();
+
+pub fn get_password_rate_limiter() -> Arc<RateLimiter> {
+    PASSWORD_RATE_LIMITER.get_or_init(|| Arc::new(RateLimiter::new(15.0, 60.0))).clone()
 }
 
 

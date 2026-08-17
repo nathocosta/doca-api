@@ -1,4 +1,4 @@
-use lopdf::{Document, Object, Dictionary};
+use lopdf::{Document, Object, Dictionary, EncryptionVersion, EncryptionState, Permissions};
 use std::collections::BTreeMap;
 use printpdf::{PdfDocument, Mm, Image, ImageTransform};
 use printpdf::image_crate::ImageDecoder;
@@ -354,6 +354,48 @@ pub fn docx_to_pdf(file: &[u8]) -> Result<Vec<u8>, String> {
     Ok(result.pdf)
 }
 
+/// Protect PDF with a password using AES-128
+pub fn protect_pdf(file: &[u8], password: &str) -> Result<Vec<u8>, String> {
+    validate_pdf_header(file)?;
+
+    let pass_len = password.chars().count();
+    if pass_len < 4 || pass_len > 128 {
+        return Err("A senha deve ter entre 4 e 128 caracteres.".to_string());
+    }
+
+    let mut doc = Document::load_mem(file).map_err(|e| format!("Falha ao carregar o PDF: {}", e))?;
+
+    if doc.is_encrypted() {
+        return Err("O arquivo PDF já está protegido por senha.".to_string());
+    }
+
+    // Ensure the PDF trailer has an ID element, which is required for PDF encryption.
+    if !doc.trailer.has(b"ID") {
+        let file_id = Object::String(vec![1u8; 16], lopdf::StringFormat::Hexadecimal);
+        doc.trailer.set("ID", Object::Array(vec![file_id.clone(), file_id]));
+    }
+
+    let version = EncryptionVersion::V2 {
+        document: &doc,
+        owner_password: password,
+        user_password: password,
+        key_length: 128,
+        permissions: Permissions::default(),
+    };
+
+    let state = EncryptionState::try_from(version)
+        .map_err(|e| format!("Falha ao configurar a criptografia: {}", e))?;
+
+    doc.encrypt(&state)
+        .map_err(|e| format!("Falha ao criptografar o PDF: {}", e))?;
+
+    let mut output = Vec::new();
+    doc.save_to(&mut output)
+        .map_err(|e| format!("Falha ao salvar o PDF criptografado: {}", e))?;
+
+    Ok(output)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -366,5 +408,42 @@ mod tests {
         assert!(parse_range("1-11", 10).is_err());
         assert!(parse_range("abc", 10).is_err());
         assert!(parse_range("5-3", 10).is_err());
+    }
+
+    #[test]
+    fn test_protect_pdf() {
+        let mut doc = Document::new();
+        let pages_id = doc.new_object_id();
+        let mut pages_dict = Dictionary::new();
+        pages_dict.set("Type", Object::Name("Pages".as_bytes().to_vec()));
+        pages_dict.set("Count", Object::Integer(0));
+        pages_dict.set("Kids", Object::Array(vec![]));
+        doc.objects.insert(pages_id, Object::Dictionary(pages_dict));
+
+        let catalog_id = doc.new_object_id();
+        let mut catalog_dict = Dictionary::new();
+        catalog_dict.set("Type", Object::Name("Catalog".as_bytes().to_vec()));
+        catalog_dict.set("Pages", Object::Reference(pages_id));
+        doc.objects.insert(catalog_id, Object::Dictionary(catalog_dict));
+        doc.trailer.set("Root", Object::Reference(catalog_id));
+
+        let mut pdf_bytes = Vec::new();
+        doc.save_to(&mut pdf_bytes).unwrap();
+
+        let password = "pdfpassword123";
+        let protected_res = protect_pdf(&pdf_bytes, password);
+        if let Err(ref e) = protected_res {
+            panic!("protect_pdf failed with: {}", e);
+        }
+        let protected_bytes = protected_res.unwrap();
+
+        let protected_doc = Document::load_mem(&protected_bytes).unwrap();
+        assert!(protected_doc.is_encrypted());
+
+        let double_protect = protect_pdf(&protected_bytes, password);
+        assert!(double_protect.is_err());
+
+        let short_protect = protect_pdf(&pdf_bytes, "123");
+        assert!(short_protect.is_err());
     }
 }
