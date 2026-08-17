@@ -1,10 +1,7 @@
 use lopdf::{Document, Object, Dictionary, EncryptionVersion, EncryptionState, Permissions};
 use std::collections::BTreeMap;
-use printpdf::{PdfDocument, Mm, Image, ImageTransform};
-use printpdf::image_crate::ImageDecoder;
-use printpdf::image_crate::codecs::png::PngDecoder;
-use printpdf::image_crate::codecs::jpeg::JpegDecoder;
-use std::io::{BufWriter, Cursor};
+use printpdf::{PdfDocument, Mm, Pt, PdfPage, Op, XObjectTransform};
+use printpdf::image::RawImage;
 
 /// Valida se os bytes representam um arquivo PDF válido (inicia com %PDF-)
 pub fn validate_pdf_header(bytes: &[u8]) -> Result<(), String> {
@@ -236,26 +233,6 @@ pub fn rotate_pdf(file: &[u8], angle: i32) -> Result<Vec<u8>, String> {
 }
 
 
-/// Decode raw image bytes to a printpdf Image, returning the image object along with dimensions (width, height)
-fn decode_to_printpdf_image(raw_bytes: &[u8]) -> Result<(Image, u32, u32), String> {
-    let cursor = Cursor::new(raw_bytes);
-    
-    // Determine image format via PNG magic bytes (137 80 78 71 13 10 26 10)
-    let is_png = raw_bytes.starts_with(&[137, 80, 78, 71, 13, 10, 26, 10]);
-    
-    if is_png {
-        let decoder = PngDecoder::new(cursor).map_err(|e| format!("Failed to initialize PNG decoder: {}", e))?;
-        let (w, h) = decoder.dimensions();
-        let img = Image::try_from(decoder).map_err(|e| format!("Failed to load PNG into PDF: {:?}", e))?;
-        Ok((img, w, h))
-    } else {
-        let decoder = JpegDecoder::new(cursor).map_err(|e| format!("Failed to initialize JPEG decoder: {}", e))?;
-        let (w, h) = decoder.dimensions();
-        let img = Image::try_from(decoder).map_err(|e| format!("Failed to load JPEG into PDF: {:?}", e))?;
-        Ok((img, w, h))
-    }
-}
-
 /// Convert multiple images (PNG/JPG) to a single PDF in-memory
 pub fn images_to_pdf(images: Vec<Vec<u8>>) -> Result<Vec<u8>, String> {
     if images.is_empty() {
@@ -265,62 +242,39 @@ pub fn images_to_pdf(images: Vec<Vec<u8>>) -> Result<Vec<u8>, String> {
         validate_image_header(raw_img).map_err(|e| format!("Imagem #{}: {}", i + 1, e))?;
     }
 
-    // Load first image to initialize the document size
-    let (first_img, w1, h1) = decode_to_printpdf_image(&images[0])?;
+    let mut doc = PdfDocument::new("Images PDF");
+    let mut warnings = Vec::new();
 
-    // Set A4 as baseline scale math: 210mm width
-    let page_width = 210.0;
-    let page_height = page_width * (h1 as f64) / (w1 as f64);
+    for (i, raw_img) in images.iter().enumerate() {
+        let image = RawImage::decode_from_bytes(raw_img, &mut warnings)
+            .map_err(|e| format!("Imagem #{}: {}", i + 1, e))?;
 
-    let (doc, page1, layer1) = PdfDocument::new("Images PDF", Mm(page_width as f32), Mm(page_height as f32), "Layer 1");
-    
-    // Add first image to first page
-    {
-        let current_layer = doc.get_page(page1).get_layer(layer1);
-        let target_dpi = (w1 as f64) * 25.4 / page_width;
-        
-        first_img.add_to_layer(
-            current_layer,
-            ImageTransform {
-                translate_x: Some(Mm(0.0)),
-                translate_y: Some(Mm(0.0)),
-                rotate: None,
-                scale_x: None,
-                scale_y: None,
-                dpi: Some(target_dpi as f32),
-            },
-        );
-    }
-
-    // Add subsequent pages and images
-    for raw_img in images.iter().skip(1) {
-        let (img, w, h) = decode_to_printpdf_image(raw_img)?;
-        
         let p_width = 210.0;
-        let p_height = p_width * (h as f64) / (w as f64);
-        
-        let (page_id, layer_id) = doc.add_page(Mm(p_width as f32), Mm(p_height as f32), "Layer 1");
-        let current_layer = doc.get_page(page_id).get_layer(layer_id);
-        
-        let target_dpi = (w as f64) * 25.4 / p_width;
-        img.add_to_layer(
-            current_layer,
-            ImageTransform {
-                translate_x: Some(Mm(0.0)),
-                translate_y: Some(Mm(0.0)),
-                rotate: None,
-                scale_x: None,
-                scale_y: None,
-                dpi: Some(target_dpi as f32),
-            },
-        );
+        let p_height = p_width * (image.height as f64) / (image.width as f64);
+
+        let image_xobject_id = doc.add_image(&image);
+
+        let target_dpi = (image.width as f64) * 25.4 / p_width;
+        let transform = XObjectTransform {
+            translate_x: Some(Pt(0.0)),
+            translate_y: Some(Pt(0.0)),
+            rotate: None,
+            scale_x: None,
+            scale_y: None,
+            dpi: Some(target_dpi as f32),
+            no_auto_scale: false,
+        };
+
+        let op = Op::UseXobject {
+            id: image_xobject_id,
+            transform,
+        };
+
+        let page = PdfPage::new(Mm(p_width as f32), Mm(p_height as f32), vec![op]);
+        doc.pages.push(page);
     }
 
-    let mut output = Vec::new();
-    let mut writer = BufWriter::new(&mut output);
-    doc.save(&mut writer).map_err(|e| format!("Failed to compile PDF from images: {}", e))?;
-    std::mem::drop(writer);
-    
+    let output = doc.save(&printpdf::PdfSaveOptions::default(), &mut warnings);
     Ok(output)
 }
 
