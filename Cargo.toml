@@ -4,7 +4,7 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
-axum = { version = "0.7.5", features = ["multipart"] }
+axum = { version = "0.8.9", features = ["multipart"] }
 tokio = { version = "1.38", features = ["full"] }
 tower-http = { version = "0.5.2", features = ["cors", "compression-full"] }
 lopdf = "0.44.0"
