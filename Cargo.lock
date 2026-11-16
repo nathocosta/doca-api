@@ -316,9 +316,9 @@ checksum = "be5eb007b7cacc6c660343e96f650fedf4b5a77512399eb952ca6642cf8d13f7"
 
 [[package]]
 name = "azul-core"
-version = "0.0.14"
+version = "0.0.17"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "3ee0f30230d2fa5b51241bfdd52f683e36b71d230b8113201102da63cc2c2600"
+checksum = "77fa7633a4f9f683b529723420e9c23081828d00b908472f0457a778b24d8e4c"
 dependencies = [
  "azul-css",
  "gl-context-loader",
@@ -328,9 +328,9 @@ dependencies = [
 
 [[package]]
 name = "azul-css"
-version = "0.0.14"
+version = "0.0.17"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "2c714fb48b855dc12cc59b417987db62aeeca9cd8dd2a3f8c9912c35e5a1fa7c"
+checksum = "093faf3f26d2164c3aa0cdf9891de966e5f813d3d964a027752bcafa03b355d2"
 dependencies = [
  "azul-simplecss",
  "libm",
@@ -338,16 +338,18 @@ dependencies = [
 
 [[package]]
 name = "azul-layout"
-version = "0.0.14"
+version = "0.0.17"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ce0b89c88dbea5c930001141108fde71d863c4a2cf441cd949b73180e13272dc"
+checksum = "b390d8128afd50d0a07f3c9bc2481b1ff5298b809c73278c54f720f3bb8c23ae"
 dependencies = [
  "allsorts-azul",
  "azul-core",
  "azul-css",
  "base64",
+ "brotli-decompressor",
  "hyphenation",
  "lru",
+ "regex-lite",
  "roxmltree 0.21.1",
  "rust-fontconfig",
  "serde",
@@ -364,9 +366,9 @@ dependencies = [
 
 [[package]]
 name = "azul-simplecss"
-version = "0.2.0"
+version = "0.2.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "8259ebd5ee48a37fd8931116405456fd67efbb5435b4789e45bdbccf5d7dea7e"
+checksum = "beea02de84f7d4c090ccf9a2bddcd0595105b35c2ed0c9a0ed66aca4b79559bd"
 
 [[package]]
 name = "base64"
@@ -2994,9 +2996,9 @@ dependencies = [
 
 [[package]]
 name = "printpdf"
-version = "0.12.6"
+version = "0.12.9"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "e75e1f6d16f80c8f34918a4cc68743d703e8ee5016fac9508e223eb8e60445a0"
+checksum = "91e8829ac96180b3c07de6a880766f9e0bbcbccd1869744a9d347ba0d830ae94"
 dependencies = [
  "allsorts-azul",
  "azul-core",
@@ -3391,6 +3393,12 @@ dependencies = [
 ]
 
 [[package]]
+name = "regex-lite"
+version = "0.1.9"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "cab834c73d247e67f4fae452806d17d3c7501756d98c8808d7c9c7aa7d18f973"
+
+[[package]]
 name = "regex-syntax"
 version = "0.8.11"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3445,9 +3453,9 @@ dependencies = [
 
 [[package]]
 name = "rust-fontconfig"
-version = "4.4.11"
+version = "5.0.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "87542166cd2a7b38cf2c338384d882656e2fbbdd9813017415f1d57ad35757e9"
+checksum = "ed5799956a5fa7abd968823c4d4876f2eb9301d5c02e2f53d0dc9471c001c782"
 dependencies = [
  "allsorts-azul",
  "mmapio",
